@@ -56,8 +56,7 @@
         /* МОБИЛЬНОЕ УПРАВЛЕНИЕ */
         .mobile-controls {
             position: absolute; bottom: 30px; left: 0; right: 0;
-            display: none; /* Скрыто по умолчанию, показываем только на мобильных */
-            justify-content: space-between; padding: 20px;
+            display: flex; justify-content: space-between; padding: 20px;
             pointer-events: none; z-index: 5000;
         }
 
@@ -95,7 +94,6 @@
             .stat-label { font-size: 0.55rem; }
             .text-2xl { font-size: 1.2rem; }
             .minimap-container { width: 120px; height: 120px; bottom: 200px; }
-            .mobile-controls { display: flex; } /* показываем на мобильных */
         }
 
         #overlay-screen {
@@ -124,12 +122,10 @@
         /* Улучшенный космос: туманности */
         .nebula-effect {
             position: fixed; inset: 0; pointer-events: none;
-            background: radial-gradient(circle at 70% 30%, rgba(20,40,100,0.25) 0%, transparent 55%),
-                        radial-gradient(circle at 20% 80%, rgba(80,20,100,0.2) 0%, transparent 60%),
-                        radial-gradient(circle at 90% 70%, rgba(0,100,150,0.15) 0%, transparent 65%),
-                        radial-gradient(circle at 40% 40%, rgba(30,60,120,0.2) 0%, transparent 70%);
+            background: radial-gradient(circle at 70% 30%, rgba(20,40,100,0.2) 0%, transparent 50%),
+                        radial-gradient(circle at 20% 80%, rgba(80,20,100,0.15) 0%, transparent 55%),
+                        radial-gradient(circle at 90% 70%, rgba(0,100,150,0.1) 0%, transparent 60%);
             z-index: 50;
-            mix-blend-mode: screen;
         }
 
         .save-indicator.active { color: #00ffaa; text-shadow: 0 0 10px #00ffaa; }
@@ -137,7 +133,7 @@
 </head>
 <body>
 
-<!-- Фоновый эффект туманности для космоса -->
+<!-- Фоновый эффект туманности для космоса (будет виден сквозь canvas) -->
 <div class="nebula-effect" id="nebulaBg" style="display: none;"></div>
 
 <div id="overlay-screen">
@@ -158,8 +154,8 @@
     </div>
 
     <div class="mt-12 text-[10px] text-gray-500 uppercase tracking-wider text-center px-4 leading-relaxed">
-        <span class="block md:hidden">🕹️ Левый стик — движение<br>🔥 Правая кнопка — огонь<br>👆 Меню — касание</span>
-        <span class="hidden md:block">W — Двигатель (летит к курсору)<br>Мышка - Поворот и Огонь (ЛКМ)</span>
+        <span class="block md:hidden">⬆️⬇️⬅️➡️ - Движение (стик)<br>🔥 - Огонь<br>👆 Кнопки интерфейса</span>
+        <span class="hidden md:block">W - Двигатель (летит к курсору)<br>Мышка - Поворот и Огонь (ЛКМ)</span>
     </div>
 </div>
 
@@ -207,12 +203,12 @@
     </div>
 </div>
 
-<div id="minimap-ui" class="minimap-container" style="display: none; position: absolute; bottom: 200px; right: 20px;">
+<div id="minimap-ui" class="minimap-container" style="display: none; bottom: 200px; right: 20px;">
     <canvas id="minimapCanvas" width="180" height="180"></canvas>
 </div>
 
-<!-- МОБИЛЬНОЕ УПРАВЛЕНИЕ (показывается только на экранах < 768px) -->
-<div class="mobile-controls md:hidden" id="mobileControls">
+<!-- МОБИЛЬНОЕ УПРАВЛЕНИЕ (видно только на экранах < 768px) -->
+<div class="mobile-controls md:hidden" id="mobileControls" style="display: none;">
     <div class="joystick-area" id="joystickArea">
         <div class="joystick-knob" id="joystickKnob"></div>
     </div>
@@ -221,7 +217,7 @@
     </div>
 </div>
 
-<!-- NPC Диалог, Магазин, Продажа -->
+<!-- NPC Диалог, Магазин, Продажа (без изменений) -->
 <div id="dialog-ui" class="glass-panel p-5 w-[90vw] max-w-[450px] fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-3000" style="display: none;">
     <div class="flex gap-3 items-center mb-3 border-b border-white/10 pb-3">
         <div class="w-12 h-12 bg-blue-600/30 rounded-lg flex items-center justify-center text-2xl border border-blue-500/50">👨‍🚀</div>
@@ -328,7 +324,7 @@ function initMobileControls() {
 
     let activeJoystick = false;
 
-    const handleTouchMove = (e) => {
+    const handleTouch = (e) => {
         e.preventDefault();
         const touch = e.touches[0];
         const rect = joystick.getBoundingClientRect();
@@ -344,16 +340,11 @@ function initMobileControls() {
     };
 
     joystick.addEventListener('touchstart', (e) => {
-        e.preventDefault();
         activeJoystick = true;
-        handleTouchMove(e);
+        handleTouch(e);
     });
-    joystick.addEventListener('touchmove', (e) => { 
-        e.preventDefault();
-        if (activeJoystick) handleTouchMove(e); 
-    });
-    joystick.addEventListener('touchend', (e) => {
-        e.preventDefault();
+    joystick.addEventListener('touchmove', (e) => { if (activeJoystick) handleTouch(e); });
+    joystick.addEventListener('touchend', () => {
         activeJoystick = false;
         mobileThrust = { x: 0, y: 0 };
         knob.style.transform = 'translate(0px, 0px)';
@@ -369,44 +360,42 @@ function initMobileControls() {
         e.preventDefault();
         mouse.down = false;
     });
-    fireBtn.addEventListener('touchcancel', (e) => {
-        e.preventDefault();
-        mouse.down = false;
-    });
 
     // Определяем мобильное устройство
     isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+        document.getElementById('mobileControls').style.display = 'flex';
+    }
 }
 
-// === КОСМОС: генерация тысяч звезд, цветных, с мерцанием ===
+// === КОСМОС: генерация звездных скоплений и туманности ===
 function generateDeepSpaceStars() {
     stars = [];
-    for(let i=0; i<4000; i++) {
-        let x = (Math.random() - 0.5) * 60000;
-        let y = (Math.random() - 0.5) * 60000;
-        let size = Math.random() * 2.8;
-        let alpha = Math.random() * 0.7 + 0.2;
-        let color;
-        let r = Math.random();
-        if (r < 0.6) color = `rgba(255,255,255,${alpha})`;
-        else if (r < 0.8) color = `rgba(180,230,255,${alpha})`;
-        else if (r < 0.95) color = `rgba(255,200,150,${alpha})`;
-        else color = `rgba(255,100,100,${alpha})`;
-        stars.push({ x, y, size, alpha, color, baseAlpha: alpha, twinkleSpeed: Math.random() * 0.02 + 0.005 });
+    for(let i=0; i<2000; i++) {
+        let x = Math.random() * 40000 - 20000;
+        let y = Math.random() * 40000 - 20000;
+        let size = Math.random() * 2.2;
+        let alpha = Math.random() * 0.7 + 0.3;
+        // Добавляем цветные звезды
+        let color = `rgba(255,255,255,${alpha})`;
+        if (Math.random() > 0.8) color = `rgba(180,230,255,${alpha})`; // голубые
+        if (Math.random() > 0.9) color = `rgba(255,200,150,${alpha})`; // теплые
+        stars.push({ x, y, size, alpha, color });
     }
+    // Добавляем фоновые туманности (рендерим отдельно)
     document.getElementById('nebulaBg').style.display = 'block';
 }
 
 function init() {
-    // Устанавливаем размер canvas
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    
     window.addEventListener('resize', () => { 
         canvas.width = window.innerWidth; 
-        canvas.height = window.innerHeight;
+        canvas.height = window.innerHeight; 
+        // Адаптация мобильного UI
         isMobile = window.innerWidth <= 768;
+        if (isMobile) document.getElementById('mobileControls').style.display = 'flex';
+        else document.getElementById('mobileControls').style.display = 'none';
     });
+    window.dispatchEvent(new Event('resize'));
 
     generateDeepSpaceStars();
 
@@ -419,12 +408,10 @@ function init() {
     
     // Мышь для десктопа
     window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
-    window.addEventListener('mousedown', (e) => { 
-        mouse.down = true; 
-        SFX.init(); 
-    });
+    window.addEventListener('mousedown', () => { mouse.down = true; SFX.init(); });
     window.addEventListener('mouseup', () => mouse.down = false);
     
+    // Отключаем контекстное меню на канвасе
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
     checkSaveData();
@@ -452,64 +439,49 @@ function checkSaveData() {
 
 function startGame(isNew) {
     if (!isNew && localStorage.getItem('nova_deep_save')) {
-        try {
-            const save = JSON.parse(localStorage.getItem('nova_deep_save'));
-            player = save.player; 
-            activeQuest = save.activeQuest;
-        } catch(e) {
-            // Если сохранение повреждено, начинаем новую игру
-            resetPlayer();
-        }
+        const save = JSON.parse(localStorage.getItem('nova_deep_save'));
+        player = save.player; 
+        activeQuest = save.activeQuest;
     } else {
-        resetPlayer();
+        player = {
+            x: 400, y: 300, vx: 0, vy: 0, angle: 0,
+            accel: 0.2, friction: 0.98,
+            hp: 100, maxHp: 100, coins: 100, cargo: 0, maxCargo: 10,
+            cargoType: null, damage: 20,
+            upgrades: { engine: 1, shield: 1, damage: 1, cargo: 1, hull: 1 }
+        };
+        activeQuest = null;
     }
-    
     gameState = 'STATION';
     document.getElementById('overlay-screen').style.display = 'none';
     document.getElementById('game-hud').style.display = 'flex';
     document.getElementById('minimap-ui').style.display = 'block';
     document.getElementById('nebulaBg').style.display = 'block';
+    if (isMobile) document.getElementById('mobileControls').style.display = 'flex';
     SFX.ui();
-}
-
-function resetPlayer() {
-    player = {
-        x: 400, y: 300, vx: 0, vy: 0, angle: 0,
-        accel: 0.2, friction: 0.98,
-        hp: 100, maxHp: 100, coins: 100, cargo: 0, maxCargo: 10,
-        cargoType: null, damage: 20,
-        upgrades: { engine: 1, shield: 1, damage: 1, cargo: 1, hull: 1 }
-    };
-    activeQuest = null;
 }
 
 function update() {
     if (gameState === 'MENU') return;
 
-    // Мобильное управление
+    // Мобильное управление: поворот к направлению движения или к цели
     if (isMobile && (mobileThrust.x !== 0 || mobileThrust.y !== 0)) {
         player.angle = Math.atan2(mobileThrust.y, mobileThrust.x);
-        const thrustPower = player.accel + player.upgrades.engine * 0.03;
-        player.vx += Math.cos(player.angle) * thrustPower * Math.hypot(mobileThrust.x, mobileThrust.y);
-        player.vy += Math.sin(player.angle) * thrustPower * Math.hypot(mobileThrust.x, mobileThrust.y);
+        // Двигаем
+        player.vx += Math.cos(player.angle) * (player.accel + player.upgrades.engine * 0.03) * Math.hypot(mobileThrust.x, mobileThrust.y);
+        player.vy += Math.sin(player.angle) * (player.accel + player.upgrades.engine * 0.03) * Math.hypot(mobileThrust.x, mobileThrust.y);
         spawnParticle(player.x - Math.cos(player.angle)*18, player.y - Math.sin(player.angle)*18, '#00d4ff', 1);
-    } 
-    // Управление с клавиатуры (ПК)
-    else if (keys['KeyW']) {
+    } else if (keys['KeyW']) {
         player.vx += Math.cos(player.angle) * (player.accel + player.upgrades.engine * 0.03);
         player.vy += Math.sin(player.angle) * (player.accel + player.upgrades.engine * 0.03);
         spawnParticle(player.x - Math.cos(player.angle)*18, player.y - Math.sin(player.angle)*18, '#00d4ff', 1);
     }
 
-    // Поворот игрока к мыши (для ПК)
-    if (!isMobile) {
+    // Поворот игрока к мыши (для десктопа) или для мобильных - к цели, если нет стика
+    if (!isMobile || (mobileThrust.x === 0 && mobileThrust.y === 0)) {
         const dx = mouse.x - canvas.width / 2;
         const dy = mouse.y - canvas.height / 2;
         if (Math.hypot(dx, dy) > 10) player.angle = Math.atan2(dy, dx);
-    } 
-    // Для мобильных: если стик не активен, поворачиваем по последнему направлению или оставляем угол
-    else if (mobileThrust.x === 0 && mobileThrust.y === 0) {
-        // Не меняем угол, оставляем как есть
     }
 
     // Стрельба
@@ -519,66 +491,32 @@ function update() {
             vx: Math.cos(player.angle) * 16 + player.vx, vy: Math.sin(player.angle) * 16 + player.vy,
             life: 65, owner: 'player', damage: player.damage
         });
-        lastShot = Date.now(); 
-        SFX.shoot();
+        lastShot = Date.now(); SFX.shoot();
     }
 
-    player.x += player.vx; 
-    player.y += player.vy;
-    player.vx *= player.friction; 
-    player.vy *= player.friction;
-
-    // Границы мира (чтобы не улететь в бесконечность)
-    const worldBound = 30000;
-    if (Math.abs(player.x) > worldBound) player.x = Math.sign(player.x) * worldBound * 0.9;
-    if (Math.abs(player.y) > worldBound) player.y = Math.sign(player.y) * worldBound * 0.9;
+    player.x += player.vx; player.y += player.vy;
+    player.vx *= player.friction; player.vy *= player.friction;
 
     if (gameState === 'STATION') updateStation();
     else if (gameState === 'SPACE') updateSpace();
     else if (gameState === 'PLANET') updatePlanet();
 
-    // Обновление пуль и частиц
-    bullets.forEach((b, i) => { 
-        b.x += b.vx; 
-        b.y += b.vy; 
-        b.life--; 
-        if (b.life <= 0) bullets.splice(i, 1); 
-    });
-    
-    particles.forEach((p, i) => { 
-        p.x += p.vx; 
-        p.y += p.vy; 
-        p.life -= 0.02; 
-        if (p.life <= 0) particles.splice(i, 1); 
-    });
-    
+    bullets.forEach((b, i) => { b.x += b.vx; b.y += b.vy; b.life--; if (b.life <= 0) bullets.splice(i, 1); });
+    particles.forEach((p, i) => { p.x += p.vx; p.y += p.vy; p.life -= 0.02; if (p.life <= 0) particles.splice(i, 1); });
     updateUI();
 }
 
 function updateStation() {
-    if (player.hp < player.maxHp) { 
-        player.hp = player.maxHp; 
-        SFX.repair(); 
-    }
-    
-    // Магазин
+    if (player.hp < player.maxHp) { player.hp = player.maxHp; SFX.repair(); }
     if (Math.hypot(player.x - 700, player.y - 300) < 80) {
         if(document.getElementById('shop-ui').style.display !== 'block') { 
             document.getElementById('shop-ui').style.display = 'block'; 
-            populateShop(); 
-            saveData(); 
+            populateShop(); saveData(); 
         }
     } else closeShop();
-    
-    // Скупка
     if (Math.hypot(player.x - 500, player.y - 300) < 80) { 
-        if(document.getElementById('sell-ui').style.display !== 'block') { 
-            openSell(); 
-            saveData(); 
-        }
+        if(document.getElementById('sell-ui').style.display !== 'block') { openSell(); saveData(); }
     } else closeSell();
-    
-    // Задания
     if (Math.hypot(player.x - 400, player.y - 600) < 70) {
         if (!activeQuest && document.getElementById('dialog-ui').style.display !== 'block') {
             document.getElementById('dialog-ui').style.display = 'block';
@@ -586,116 +524,60 @@ function updateStation() {
             saveData(); 
         }
     } else closeDialog();
-    
-    // Взлет
-    if (Math.hypot(player.x - 150, player.y - 300) < 70) { 
-        gameState = 'SPACE'; 
-        player.x = 400; 
-        player.y = 0; 
-        player.vx = 4; 
-        saveData(); 
-    }
+    if (Math.hypot(player.x - 150, player.y - 300) < 70) { gameState = 'SPACE'; player.x = 400; player.y = 0; player.vx = 4; saveData(); }
 }
 
 function updateSpace() {
-    // Возврат на станцию
-    if (Math.hypot(player.x, player.y) < 220) { 
-        gameState = 'STATION'; 
-        player.x = 250; 
-        player.y = 300; 
-        player.vx = 0; 
-        player.vy = 0; 
-    }
-    
-    // Планеты
+    if (Math.hypot(player.x, player.y) < 220) { gameState = 'STATION'; player.x = 250; player.y = 300; player.vx = 0; player.vy = 0; }
     planets.forEach(p => {
         const d = Math.hypot(player.x - p.x, player.y - p.y);
         if (d < p.radius + 20) {
             if (player.upgrades.shield >= p.id + 1) landOnPlanet(p);
-            else { 
-                player.hp -= 0.4; 
-                player.vx = (player.x - p.x) * 0.1; 
-                player.vy = (player.y - p.y) * 0.1; 
-                SFX.hit(); 
-            }
+            else { player.hp -= 0.4; player.vx = (player.x - p.x) * 0.1; player.vy = (player.y - p.y) * 0.1; SFX.hit(); }
         }
     });
 
-    // Спавн врагов
     const distFromBase = Math.hypot(player.x, player.y);
     const difficultyLevel = Math.min(9, Math.floor(distFromBase / 1800));
     if (enemies.length < 4 + difficultyLevel) {
         const tier = difficultyLevel;
         enemies.push({ 
-            x: player.x + (Math.random()-0.5)*3500, 
-            y: player.y + (Math.random()-0.5)*3500, 
-            hp: 50 + tier * 120, 
-            maxHp: 50 + tier * 120, 
-            tier: tier, 
-            radius: 18 + tier, 
-            color: TIERS[tier]?.enemyColor || '#ff00ff', 
-            isSpaceEnemy: true
+            x: player.x + (Math.random()-0.5)*3500, y: player.y + (Math.random()-0.5)*3500, 
+            hp: 50 + tier * 120, maxHp: 50 + tier * 120, tier: tier, radius: 18 + tier, 
+            color: TIERS[tier]?.enemyColor || '#ff00ff', isSpaceEnemy: true
         });
     }
     handleCombat(enemies);
 }
 
 function landOnPlanet(p) {
-    currentPlanet = p; 
-    gameState = 'PLANET';
-    player.x = 0; 
-    player.y = 0; 
-    player.vx = 0; 
-    player.vy = 0;
-    
-    planetResources = []; 
-    enemies = [];
-    
-    for(let i=0; i<10 + p.id*3; i++) {
-        planetResources.push({ 
-            x: (Math.random()-0.5)*1700, 
-            y: (Math.random()-0.5)*1700, 
-            collected: false 
-        });
-    }
-    
-    for(let i=0; i<3 + p.id; i++) {
-        enemies.push({ 
-            x: (Math.random()-0.5)*1400, 
-            y: (Math.random()-0.5)*1400, 
-            hp: 40 + p.id*55, 
-            maxHp: 40 + p.id*55, 
-            radius: 17, 
-            color: p.enemyColor, 
-            tier: p.id 
-        });
-    }
+    currentPlanet = p; gameState = 'PLANET';
+    player.x = 0; player.y = 0; player.vx = 0; player.vy = 0;
+    planetResources = []; enemies = [];
+    for(let i=0; i<10 + p.id*3; i++) planetResources.push({ x: (Math.random()-0.5)*1700, y: (Math.random()-0.5)*1700, collected: false });
+    for(let i=0; i<3 + p.id; i++) enemies.push({ 
+        x: (Math.random()-0.5)*1400, y: (Math.random()-0.5)*1400, 
+        hp: 40 + p.id*55, maxHp: 40 + p.id*55, radius: 17, color: p.enemyColor, tier: p.id 
+    });
     SFX.ui();
 }
 
 function updatePlanet() {
-    // Выход с планеты
     if (Math.hypot(player.x, player.y) > 1000) {
         gameState = 'SPACE';
         const a = Math.atan2(player.y, player.x);
         player.x = currentPlanet.x + Math.cos(a)*(currentPlanet.radius + 80);
         player.y = currentPlanet.y + Math.sin(a)*(currentPlanet.radius + 80);
-        player.vx = Math.cos(a)*6; 
-        player.vy = Math.sin(a)*6;
+        player.vx = Math.cos(a)*6; player.vy = Math.sin(a)*6;
     }
-    
-    // Сбор ресурсов
     planetResources.forEach(res => {
         if (!res.collected && Math.hypot(player.x - res.x, player.y - res.y) < 45) {
             if (player.cargo < player.maxCargo) {
                 if (player.cargoType && player.cargoType !== currentPlanet.ore) return;
-                res.collected = true; 
-                player.cargo++; 
-                player.cargoType = currentPlanet.ore;
+                res.collected = true; player.cargo++; player.cargoType = currentPlanet.ore;
                 SFX.pickup();
                 if (activeQuest && activeQuest.type === 'collect' && activeQuest.target === currentPlanet.ore) {
-                    activeQuest.progress++; 
-                    if (activeQuest.progress >= activeQuest.goal) completeQuest();
+                    activeQuest.progress++; if (activeQuest.progress >= activeQuest.goal) completeQuest();
                 }
             }
         }
@@ -708,44 +590,25 @@ function handleCombat(targets) {
         const d = Math.hypot(player.x - en.x, player.y - en.y);
         if (d < 750) {
             const a = Math.atan2(player.y - en.y, player.x - en.x);
-            en.x += Math.cos(a) * 2.5; 
-            en.y += Math.sin(a) * 2.5;
+            en.x += Math.cos(a) * 2.5; en.y += Math.sin(a) * 2.5;
             if (d < 400 && Math.random() < 0.025) {
-                bullets.push({ 
-                    x: en.x, 
-                    y: en.y, 
-                    vx: Math.cos(a)*9, 
-                    vy: Math.sin(a)*9, 
-                    life: 50, 
-                    owner: 'enemy', 
-                    damage: 3 + (en.tier||0) 
-                });
+                bullets.push({ x: en.x, y: en.y, vx: Math.cos(a)*9, vy: Math.sin(a)*9, life: 50, owner: 'enemy', damage: 3 + (en.tier||0) });
             }
         }
-        
         bullets.forEach((b, bi) => {
             if (b.owner === 'player' && Math.hypot(b.x - en.x, b.y - en.y) < en.radius + 5) {
-                en.hp -= b.damage; 
-                bullets.splice(bi, 1); 
-                SFX.hit();
+                en.hp -= b.damage; bullets.splice(bi, 1); SFX.hit();
                 if (en.hp <= 0) {
-                    targets.splice(i, 1); 
-                    player.coins += 20 + (en.tier||0)*30;
+                    targets.splice(i, 1); player.coins += 20 + (en.tier||0)*30;
                     spawnExplosion(en.x, en.y, en.color, 10);
-                    if (activeQuest && activeQuest.type === 'kill') { 
-                        activeQuest.progress++; 
-                        if (activeQuest.progress >= activeQuest.goal) completeQuest(); 
-                    }
+                    if (activeQuest && activeQuest.type === 'kill') { activeQuest.progress++; if (activeQuest.progress >= activeQuest.goal) completeQuest(); }
                 }
             }
         });
     });
-    
     bullets.forEach((b, bi) => {
         if (b.owner === 'enemy' && Math.hypot(b.x - player.x, b.y - player.y) < 18) {
-            player.hp -= b.damage || 5; 
-            bullets.splice(bi, 1); 
-            SFX.hit();
+            player.hp -= b.damage || 5; bullets.splice(bi, 1); SFX.hit();
             if (player.hp <= 0) die();
         }
     });
@@ -753,80 +616,56 @@ function handleCombat(targets) {
 
 function die() { 
     player.hp = player.maxHp; 
-    player.x = 250; 
-    player.y = 300; 
-    player.vx = 0; 
-    player.vy = 0; 
+    player.x = 250; player.y = 300; 
+    player.vx = 0; player.vy = 0; 
     player.cargo = 0; 
     gameState = 'STATION'; 
     saveData(); 
 }
 
-// === УЛУЧШЕННЫЙ КОСМОС: звезды с параллаксом и мерцанием ===
+// === УЛУЧШЕННЫЙ КОСМОС: звезды, туманности ===
 function drawSpace() {
-    // Рисуем звезды с мерцанием
+    // Рисуем звезды с параллаксом и мерцанием
     stars.forEach(s => {
-        let twinkle = Math.sin(Date.now() * s.twinkleSpeed + s.x * 0.01) * 0.2 + 0.8;
-        ctx.fillStyle = s.color.replace(/[\d\.]+\)$/g, `${s.alpha * twinkle})`);
+        ctx.fillStyle = s.color || `rgba(255,255,255,${s.alpha * (0.8 + Math.sin(Date.now()*0.001 + s.x)*0.2)})`;
         ctx.fillRect(s.x, s.y, s.size, s.size);
     });
 
-    // Туманности
+    // Дополнительная дымка/туманность на дальних координатах
     ctx.save();
-    ctx.globalAlpha = 0.2;
-    ctx.filter = 'blur(40px)';
-    for (let i=0; i<8; i++) {
-        let nx = (Math.sin(Date.now()*0.00005 + i)*7000) % 30000;
-        let ny = (Math.cos(Date.now()*0.00007 + i)*7000) % 30000;
-        ctx.fillStyle = `rgba(${70+i*20}, ${40+i*15}, 160, 0.08)`;
-        ctx.beginPath(); 
-        ctx.arc(nx, ny, 1200, 0, Math.PI*2); 
-        ctx.fill();
+    ctx.globalAlpha = 0.15;
+    ctx.filter = 'blur(25px)';
+    for (let i=0; i<5; i++) {
+        let nx = (Math.sin(Date.now()*0.0001 + i)*5000) % 20000;
+        let ny = (Math.cos(Date.now()*0.00015 + i)*5000) % 20000;
+        ctx.fillStyle = `rgba(${80+i*20}, ${50+i*10}, 180, 0.1)`;
+        ctx.beginPath(); ctx.arc(nx, ny, 800, 0, Math.PI*2); ctx.fill();
     }
     ctx.restore();
 
     // База
     ctx.save();
-    ctx.strokeStyle = '#00d4ff'; 
-    ctx.lineWidth = 3;
-    ctx.shadowBlur = 20; 
-    ctx.shadowColor = '#00d4ff';
-    ctx.beginPath(); 
-    ctx.arc(0, 0, 130, 0, Math.PI*2); 
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(0, 212, 255, 0.15)'; 
-    ctx.fill();
-    ctx.fillStyle = '#fff'; 
-    ctx.font = "bold 16px Orbitron"; 
-    ctx.textAlign = "center";
+    ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 3;
+    ctx.shadowBlur = 20; ctx.shadowColor = '#00d4ff';
+    ctx.beginPath(); ctx.arc(0, 0, 130, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = 'rgba(0, 212, 255, 0.15)'; ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = "bold 16px Orbitron"; ctx.textAlign = "center";
     ctx.fillText("СТАНЦИЯ АЛЬФА", 0, -160);
     ctx.restore();
 
-    // Планеты
+    // Планеты с сиянием
     planets.forEach(p => {
         ctx.save();
-        ctx.shadowBlur = 35; 
-        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 35; ctx.shadowColor = p.color;
         const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius);
-        g.addColorStop(0, p.color); 
-        g.addColorStop(0.8, '#000');
-        ctx.fillStyle = g; 
-        ctx.beginPath(); 
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); 
-        ctx.fill();
+        g.addColorStop(0, p.color); g.addColorStop(0.8, '#000');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill();
         ctx.restore();
 
         ctx.strokeStyle = player.upgrades.shield >= p.id+1 ? '#00ffaa' : '#ff5555';
-        ctx.setLineDash([6, 10]); 
-        ctx.beginPath(); 
-        ctx.arc(p.x, p.y, p.radius+18, 0, Math.PI*2); 
-        ctx.stroke();
+        ctx.setLineDash([6, 10]); ctx.beginPath(); ctx.arc(p.x, p.y, p.radius+18, 0, Math.PI*2); ctx.stroke();
         ctx.setLineDash([]);
-        
-        ctx.fillStyle = '#fff'; 
-        ctx.font = "bold 14px Orbitron"; 
-        ctx.shadowBlur = 10; 
-        ctx.shadowColor = '#00d4ff';
+        ctx.fillStyle = '#fff'; ctx.font = "bold 14px Orbitron"; ctx.shadowBlur = 10; ctx.shadowColor = '#00d4ff';
         ctx.fillText(`${p.name} (T${p.id+1})`, p.x, p.y - p.radius - 30);
         ctx.shadowBlur = 0;
     });
@@ -835,9 +674,8 @@ function drawSpace() {
 function draw() {
     if (gameState === 'MENU') return;
     
-    // Фон
-    ctx.fillStyle = '#03030a'; 
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Фон с глубоким космосом (всегда черный с туманностями)
+    ctx.fillStyle = '#03030a'; ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     ctx.save();
     ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
@@ -846,136 +684,60 @@ function draw() {
     else if (gameState === 'SPACE') drawSpace();
     else drawPlanetSurface();
 
-    // Частицы
-    particles.forEach(p => { 
-        ctx.globalAlpha = p.life; 
-        ctx.fillStyle = p.color; 
-        ctx.beginPath(); 
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); 
-        ctx.fill(); 
-    });
+    particles.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); });
     ctx.globalAlpha = 1;
 
-    // Враги
     enemies.forEach(en => {
-        ctx.shadowBlur = 15; 
-        ctx.shadowColor = en.color;
-        ctx.fillStyle = en.color; 
-        ctx.beginPath(); 
-        ctx.arc(en.x, en.y, en.radius, 0, Math.PI*2); 
-        ctx.fill();
+        ctx.shadowBlur = 15; ctx.shadowColor = en.color;
+        ctx.fillStyle = en.color; ctx.beginPath(); ctx.arc(en.x, en.y, en.radius, 0, Math.PI*2); ctx.fill();
         ctx.shadowBlur = 0;
-        ctx.fillStyle = 'rgba(0,0,0,0.7)'; 
-        ctx.fillRect(en.x - 20, en.y - en.radius - 12, 40, 5);
-        ctx.fillStyle = '#ff2222'; 
-        ctx.fillRect(en.x - 20, en.y - en.radius - 12, 40 * (Math.max(0, en.hp) / en.maxHp), 5);
+        ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(en.x - 20, en.y - en.radius - 12, 40, 5);
+        ctx.fillStyle = '#ff2222'; ctx.fillRect(en.x - 20, en.y - en.radius - 12, 40 * (Math.max(0, en.hp) / en.maxHp), 5);
     });
 
-    // Пули
-    bullets.forEach(b => { 
-        ctx.fillStyle = b.owner === 'player' ? '#00ffff' : '#ff44aa'; 
-        ctx.shadowBlur = 12; 
-        ctx.shadowColor = b.owner === 'player' ? '#00d4ff' : '#ff00aa'; 
-        ctx.beginPath(); 
-        ctx.arc(b.x, b.y, 4, 0, Math.PI*2); 
-        ctx.fill(); 
-    });
+    bullets.forEach(b => { ctx.fillStyle = b.owner === 'player' ? '#00ffff' : '#ff44aa'; ctx.shadowBlur = 12; ctx.shadowColor = b.owner === 'player' ? '#00d4ff' : '#ff00aa'; ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI*2); ctx.fill(); });
     ctx.shadowBlur = 0;
 
     // Корабль игрока
-    ctx.save(); 
-    ctx.translate(player.x, player.y); 
-    ctx.rotate(player.angle);
-    ctx.shadowBlur = 20; 
-    ctx.shadowColor = '#00d4ff';
-    ctx.fillStyle = '#a0f0ff'; 
-    ctx.beginPath();
-    ctx.moveTo(26, 0); 
-    ctx.lineTo(-14, -16); 
-    ctx.lineTo(-8, 0); 
-    ctx.lineTo(-14, 16); 
-    ctx.closePath(); 
-    ctx.fill();
+    ctx.save(); ctx.translate(player.x, player.y); ctx.rotate(player.angle);
+    ctx.shadowBlur = 20; ctx.shadowColor = '#00d4ff';
+    ctx.fillStyle = '#a0f0ff'; ctx.beginPath();
+    ctx.moveTo(26, 0); ctx.lineTo(-14, -16); ctx.lineTo(-8, 0); ctx.lineTo(-14, 16); ctx.closePath(); ctx.fill();
     ctx.restore();
 
     ctx.restore();
-    
-    if (gameState === 'SPACE') { 
-        drawMinimap(); 
-        drawNavigation(); 
-    }
+    if (gameState === 'SPACE') { drawMinimap(); drawNavigation(); }
 }
 
 function drawPlanetSurface() {
-    // Граница планеты
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)'; 
-    ctx.lineWidth = 25;
-    ctx.beginPath(); 
-    ctx.arc(0, 0, 1000, 0, Math.PI*2); 
-    ctx.stroke();
-    
-    // Ресурсы
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 25;
+    ctx.beginPath(); ctx.arc(0, 0, 1000, 0, Math.PI*2); ctx.stroke();
     planetResources.forEach(res => {
         if (!res.collected) {
-            ctx.fillStyle = currentPlanet.color; 
-            ctx.shadowBlur = 18; 
-            ctx.shadowColor = currentPlanet.color;
-            ctx.beginPath(); 
-            ctx.moveTo(res.x, res.y-12); 
-            ctx.lineTo(res.x+12, res.y+12); 
-            ctx.lineTo(res.x-12, res.y+12); 
-            ctx.fill();
+            ctx.fillStyle = currentPlanet.color; ctx.shadowBlur = 18; ctx.shadowColor = currentPlanet.color;
+            ctx.beginPath(); ctx.moveTo(res.x, res.y-12); ctx.lineTo(res.x+12, res.y+12); ctx.lineTo(res.x-12, res.y+12); ctx.fill();
         }
     });
     ctx.shadowBlur = 0;
 }
 
 function drawStation() {
-    ctx.fillStyle = '#0a1a2a'; 
-    ctx.fillRect(-500, -500, 2000, 2000);
-    
-    for(let i=-400; i<=1400; i+=150) { 
-        ctx.strokeStyle = '#2a4a6a'; 
-        ctx.lineWidth = 0.5; 
-        ctx.beginPath(); 
-        ctx.moveTo(i, -400); 
-        ctx.lineTo(i, 1400); 
-        ctx.stroke(); 
-        ctx.beginPath(); 
-        ctx.moveTo(-400, i); 
-        ctx.lineTo(1400, i); 
-        ctx.stroke(); 
-    }
-    
+    ctx.fillStyle = '#0a1a2a'; ctx.fillRect(-500, -500, 2000, 2000);
+    for(let i=-400; i<=1400; i+=150) { ctx.strokeStyle = '#2a4a6a'; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(i, -400); ctx.lineTo(i, 1400); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-400, i); ctx.lineTo(1400, i); ctx.stroke(); }
     const drawZone = (x, y, color, label) => {
-        ctx.fillStyle = '#1e2f3f'; 
-        ctx.fillRect(x, y, 120, 120);
-        ctx.strokeStyle = color; 
-        ctx.lineWidth = 3; 
-        ctx.strokeRect(x, y, 120, 120);
-        ctx.fillStyle = '#fff'; 
-        ctx.font = "12px Orbitron"; 
-        ctx.fillText(label, x + 60, y + 65);
+        ctx.fillStyle = '#1e2f3f'; ctx.fillRect(x, y, 120, 120);
+        ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.strokeRect(x, y, 120, 120);
+        ctx.fillStyle = '#fff'; ctx.font = "12px Orbitron"; ctx.fillText(label, x + 60, y + 65);
     };
-    
-    drawZone(90, 240, '#2ed573', "ВЗЛЕТ"); 
-    drawZone(640, 240, '#00d4ff', "ДОК"); 
-    drawZone(440, 240, '#ffa502', "РЫНОК"); 
-    drawZone(340, 540, '#3742fa', "ЗАДАНИЯ");
+    drawZone(90, 240, '#2ed573', "ВЗЛЕТ"); drawZone(640, 240, '#00d4ff', "ДОК"); drawZone(440, 240, '#ffa502', "РЫНОК"); drawZone(340, 540, '#3742fa', "ЗАДАНИЯ");
 }
 
 function drawNavigation() {
     drawPointer(0, 0, '#00d4ff', "БАЗА");
-    
     if (activeQuest) {
         let tx, ty;
-        if (activeQuest.type === 'collect') { 
-            const p = planets.find(pl => pl.ore === activeQuest.target); 
-            if (p) { tx = p.x; ty = p.y; }
-        } else if(enemies.length > 0) { 
-            tx = enemies[0].x; 
-            ty = enemies[0].y; 
-        }
+        if (activeQuest.type === 'collect') { const p = planets.find(pl => pl.ore === activeQuest.target); tx = p.x; ty = p.y; }
+        else if(enemies.length > 0) { tx = enemies[0].x; ty = enemies[0].y; }
         if (tx !== undefined) drawPointer(tx, ty, '#ffcc00', "ЦЕЛЬ");
     }
 }
@@ -983,44 +745,23 @@ function drawNavigation() {
 function drawPointer(tx, ty, color, label) {
     if (Math.hypot(player.x - tx, player.y - ty) < 500) return;
     const angle = Math.atan2(ty - player.y, tx - player.x);
-    ctx.save(); 
-    ctx.translate(canvas.width/2, canvas.height/2); 
-    ctx.rotate(angle);
-    ctx.fillStyle = color; 
-    ctx.shadowBlur = 15; 
-    ctx.shadowColor = color;
-    ctx.beginPath(); 
-    ctx.moveTo(180, 0); 
-    ctx.lineTo(160, -12); 
-    ctx.lineTo(168, 0); 
-    ctx.lineTo(160, 12); 
-    ctx.fill();
+    ctx.save(); ctx.translate(canvas.width/2, canvas.height/2); ctx.rotate(angle);
+    ctx.fillStyle = color; ctx.shadowBlur = 15; ctx.shadowColor = color;
+    ctx.beginPath(); ctx.moveTo(180, 0); ctx.lineTo(160, -12); ctx.lineTo(168, 0); ctx.lineTo(160, 12); ctx.fill();
     ctx.restore();
 }
 
 function drawMinimap() {
-    mCtx.fillStyle = '#03060a'; 
-    mCtx.fillRect(0,0,180,180);
+    mCtx.fillStyle = '#03060a'; mCtx.fillRect(0,0,180,180);
     const z = 0.007, cx = 90;
-    
-    planets.forEach(p => { 
-        mCtx.fillStyle = p.color; 
-        mCtx.shadowBlur = 6; 
-        mCtx.shadowColor = p.color; 
-        mCtx.beginPath(); 
-        mCtx.arc(cx + (p.x - player.x)*z, cx + (p.y - player.y)*z, 3, 0, Math.PI*2); 
-        mCtx.fill(); 
-    });
-    
+    planets.forEach(p => { mCtx.fillStyle = p.color; mCtx.shadowBlur = 6; mCtx.shadowColor = p.color; mCtx.beginPath(); mCtx.arc(cx + (p.x - player.x)*z, cx + (p.y - player.y)*z, 3, 0, Math.PI*2); mCtx.fill(); });
     mCtx.shadowBlur = 0;
-    mCtx.fillStyle = '#00d4ff'; 
-    mCtx.fillRect(cx-3, cx-3, 6, 6);
+    mCtx.fillStyle = '#00d4ff'; mCtx.fillRect(cx-3, cx-3, 6, 6);
 }
 
 function populateShop() {
     const container = document.getElementById('shop-items');
     container.innerHTML = '';
-    
     const upgrades = [
         { id: 'engine', name: 'Тяговый двигатель', cost: Math.floor(250 * Math.pow(2.1, player.upgrades.engine-1)) },
         { id: 'shield', name: 'Система щитов (Тир)', cost: Math.floor(500 * Math.pow(2.3, player.upgrades.shield-1)) },
@@ -1028,7 +769,6 @@ function populateShop() {
         { id: 'cargo', name: 'Грузовой модуль', cost: Math.floor(200 * Math.pow(1.8, player.upgrades.cargo-1)) },
         { id: 'hull', name: 'Усиление корпуса', cost: Math.floor(300 * Math.pow(1.85, player.upgrades.hull-1)) }
     ];
-    
     upgrades.forEach(u => {
         const div = document.createElement('div');
         div.className = "flex justify-between items-center p-3 bg-white/10 rounded border border-white/20";
@@ -1040,17 +780,11 @@ function populateShop() {
 
 function buyUpgrade(type, cost) {
     if (player.coins >= cost) {
-        player.coins -= cost; 
-        player.upgrades[type]++;
+        player.coins -= cost; player.upgrades[type]++;
         if (type === 'damage') player.damage += 15;
         if (type === 'cargo') player.maxCargo += 10;
-        if (type === 'hull') { 
-            player.maxHp += 60; 
-            player.hp = player.maxHp; 
-        }
-        SFX.ui(); 
-        saveData(); 
-        populateShop();
+        if (type === 'hull') { player.maxHp += 60; player.hp = player.maxHp; }
+        SFX.ui(); saveData(); populateShop();
     }
 }
 
@@ -1072,46 +806,20 @@ function openSell() {
 function sellCargo() {
     const tier = TIERS.find(t => t.ore === player.cargoType);
     const price = player.cargo * (tier ? tier.price : 5);
-    player.coins += price; 
-    player.cargo = 0; 
-    player.cargoType = null;
-    SFX.pickup(); 
-    saveData(); 
-    openSell();
+    player.coins += price; player.cargo = 0; player.cargoType = null;
+    SFX.pickup(); saveData(); openSell();
 }
 
 function acceptQuest() {
     const isKill = Math.random() > 0.5;
-    if (isKill) {
-        activeQuest = { 
-            type: 'kill', 
-            goal: 5, 
-            progress: 0, 
-            reward: 180, 
-            desc: "Уничтожить врагов в секторе: " 
-        };
-    } else {
+    if (isKill) activeQuest = { type: 'kill', goal: 5, progress: 0, reward: 180, desc: "Уничтожить врагов в секторе: " };
+    else {
         const target = planets[Math.floor(Math.random() * Math.min(planets.length, player.upgrades.shield))];
-        activeQuest = { 
-            type: 'collect', 
-            target: target.ore, 
-            goal: 7, 
-            progress: 0, 
-            reward: 250, 
-            desc: `Добыть ${target.ore}: ` 
-        };
+        activeQuest = { type: 'collect', target: target.ore, goal: 7, progress: 0, reward: 250, desc: `Добыть ${target.ore}: ` };
     }
-    closeDialog(); 
-    SFX.ui(); 
-    saveData();
+    closeDialog(); SFX.ui(); saveData();
 }
-
-function completeQuest() { 
-    player.coins += activeQuest.reward; 
-    activeQuest = null; 
-    SFX.ui(); 
-    saveData(); 
-}
+function completeQuest() { player.coins += activeQuest.reward; activeQuest = null; SFX.ui(); saveData(); }
 
 function updateUI() {
     document.getElementById('coins').innerText = Math.floor(player.coins);
@@ -1125,33 +833,15 @@ function updateUI() {
     document.getElementById('dmg-lvl').innerText = player.upgrades.damage;
     document.getElementById('hull-lvl').innerText = player.upgrades.hull;
     document.getElementById('cargo-type').innerText = player.cargoType || "";
-    
     if (activeQuest) {
         document.getElementById('quest-hud').style.display = 'block';
         document.getElementById('quest-desc').innerText = `${activeQuest.desc} ${activeQuest.progress}/${activeQuest.goal}`;
-    } else {
-        document.getElementById('quest-hud').style.display = 'none';
-    }
-    
-    document.getElementById('sector-name').innerText = gameState === 'STATION' ? "СТАНЦИЯ АЛЬФА" : 
-                                                      (gameState === 'SPACE' ? "ГЛУБОКИЙ КОСМОС" : 
-                                                      (currentPlanet ? currentPlanet.name : "---"));
+    } else document.getElementById('quest-hud').style.display = 'none';
+    document.getElementById('sector-name').innerText = gameState === 'STATION' ? "СТАНЦИЯ АЛЬФА" : (gameState === 'SPACE' ? "ГЛУБОКИЙ КОСМОС" : currentPlanet.name);
 }
 
-function spawnParticle(x, y, color, size) { 
-    particles.push({ 
-        x, y, 
-        vx: (Math.random()-0.5)*2.5, 
-        vy: (Math.random()-0.5)*2.5, 
-        life: 1, 
-        color, 
-        size: 2*size 
-    }); 
-}
-
-function spawnExplosion(x, y, color, count) { 
-    for(let i=0; i<count*3; i++) spawnParticle(x, y, color, 1.8); 
-}
+function spawnParticle(x, y, color, size) { particles.push({ x, y, vx: (Math.random()-0.5)*2.5, vy: (Math.random()-0.5)*2.5, life: 1, color, size: 2*size }); }
+function spawnExplosion(x, y, color, count) { for(let i=0; i<count*3; i++) spawnParticle(x, y, color, 1.8); }
 
 function saveData() { 
     localStorage.setItem('nova_deep_save', JSON.stringify({ player, activeQuest })); 
