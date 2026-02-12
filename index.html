@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Звездный Скиталец: Nova EX - Deep Mining</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Exo+2:wght@300;600&display=swap');
+        
+        body {
+            margin: 0; overflow: hidden; background: #010105;
+            font-family: 'Exo 2', sans-serif; color: #b0b0ff; user-select: none;
+        }
+        
+        canvas { display: block; }
+
+        .hud-container {
+            position: absolute; inset: 0; pointer-events: none;
+            padding: 20px; display: flex; flex-direction: column; justify-content: space-between;
+        }
+
+        .glass-panel {
+            background: rgba(10, 20, 45, 0.92);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.15);
+            backdrop-filter: blur(12px);
+            border-radius: 4px; pointer-events: auto;
+        }
+
+        .stat-label {
+            font-family: 'Orbitron', sans-serif; font-size: 0.65rem;
+            color: #00d4ff; text-transform: uppercase; letter-spacing: 1px;
+        }
+
+        .btn-sci-fi {
+            font-family: 'Orbitron', sans-serif; background: rgba(0, 212, 255, 0.1);
+            border: 1px solid #00d4ff; color: #00d4ff; padding: 10px 16px;
+            font-size: 0.75rem; cursor: pointer; transition: 0.2s;
+            clip-path: polygon(10% 0, 100% 0, 90% 100%, 0% 100%);
+            text-transform: uppercase;
+        }
+
+        .btn-sci-fi:hover:not(:disabled) {
+            background: #00d4ff; color: #000; box-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
+        }
+
+        .btn-sci-fi:disabled {
+            opacity: 0.2; cursor: not-allowed;
+        }
+
+        #overlay-screen {
+            position: fixed; inset: 0; background: radial-gradient(circle at center, #0a142d 0%, #000 100%);
+            z-index: 5000; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+
+        #dialog-ui, #shop-ui, #sell-ui {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            display: none; z-index: 3000;
+        }
+
+        .minimap-container {
+            width: 180px; height: 180px; border: 2px solid rgba(0, 212, 255, 0.2);
+            background: rgba(0, 5, 15, 0.8); border-radius: 50%;
+            overflow: hidden; position: absolute; bottom: 30px; right: 30px;
+            pointer-events: none;
+        }
+
+        .save-indicator {
+            display: flex; align-items: center; gap: 8px; margin-top: 15px;
+            font-family: 'Orbitron', sans-serif; font-size: 10px;
+            color: #333; transition: 0.5s;
+        }
+        .save-indicator.active { color: #00ff88; text-shadow: 0 0 5px #00ff88; }
+    </style>
+</head>
+<body>
+
+<div id="overlay-screen">
+    <h1 class="text-6xl font-bold mb-2 tracking-[0.5em] text-white font-['Orbitron']">NOVA EX</h1>
+    <p class="text-blue-400 mb-12 tracking-widest text-sm italic opacity-80 font-['Orbitron']">COSMIC MINER & PILOT</p>
+    
+    <div class="flex flex-col gap-4 w-72">
+        <!-- Кнопка Продолжить: стиль изменен для видимости -->
+        <button id="btn-continue" onclick="startGame(false)" class="btn-sci-fi py-4 text-lg border-green-500 text-green-400 hidden" style="background: rgba(16, 185, 129, 0.1);">
+            Продолжить путь
+        </button>
+        <button onclick="startGame(true)" class="btn-sci-fi py-4 text-lg">Новая экспедиция</button>
+    </div>
+
+    <!-- Индикатор наличия сохранения -->
+    <div id="save-status" class="save-indicator">
+        <span class="w-2 h-2 rounded-full bg-current"></span>
+        <span>ДАННЫЕ СОХРАНЕНИЯ ОБНАРУЖЕНЫ</span>
+    </div>
+
+    <div class="mt-12 text-[11px] text-gray-500 uppercase tracking-tighter text-center">
+        W - Двигатель (летит к курсору)<br>
+        Мышка - Поворот и Огонь (ЛКМ)
+    </div>
+</div>
+
+<div class="hud-container" id="game-hud" style="display: none;">
+    <div class="flex justify-between items-start">
+        <div class="glass-panel p-4 flex gap-8">
+            <div class="flex flex-col">
+                <span class="stat-label">Кредиты</span>
+                <span class="text-2xl font-bold text-white"><span id="coins">0</span> 💳</span>
+            </div>
+            <div class="flex flex-col">
+                <span class="stat-label">Грузовой отсек</span>
+                <div class="flex items-end gap-1">
+                    <span class="text-2xl font-bold text-cyan-400" id="cargo">0</span>
+                    <span class="text-xs opacity-50 mb-1">/ <span id="maxCargo">10</span></span>
+                </div>
+                <div id="cargo-type" class="text-[9px] text-blue-300 font-bold uppercase"></div>
+            </div>
+            <div class="flex flex-col w-40">
+                <span class="stat-label text-red-400">Корпус <span id="hp-text">100</span>/<span id="max-hp-text">100</span></span>
+                <div class="h-2 bg-gray-900 mt-2 rounded-sm overflow-hidden border border-red-900/40">
+                    <div id="hp-bar" class="h-full bg-gradient-to-r from-red-600 to-red-400" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+        <div class="glass-panel p-4 text-right">
+            <span class="stat-label">Бортовые системы</span>
+            <div class="text-white text-xs mt-1 font-['Orbitron']">
+                Двигатель Ур.<span id="eng-lvl">1</span><br>
+                Щиты Ур.<span id="shd-lvl">1</span><br>
+                Орудия Ур.<span id="dmg-lvl">1</span><br>
+                Корпус Ур.<span id="hull-lvl">1</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="quest-hud" class="glass-panel p-3 w-72 mt-6 ml-4 border-l-4 border-l-yellow-500" style="display: none;">
+        <span class="stat-label">Активный Контракт</span>
+        <div id="quest-desc" class="text-white text-xs mt-1 font-semibold leading-tight">...</div>
+    </div>
+
+    <div class="flex justify-between items-end">
+        <div class="glass-panel p-2 px-6 mb-4">
+            <span class="stat-label">Локация</span>
+            <div id="sector-name" class="text-lg font-bold text-white font-['Orbitron'] uppercase tracking-wider">---</div>
+        </div>
+    </div>
+</div>
+
+<div id="minimap-ui" class="minimap-container" style="display: none;">
+    <canvas id="minimapCanvas" width="180" height="180"></canvas>
+</div>
+
+<!-- NPC Диалог -->
+<div id="dialog-ui" class="glass-panel p-6 w-[450px]">
+    <div class="flex gap-4 items-center mb-4 border-b border-white/10 pb-4">
+        <div class="w-14 h-14 bg-blue-600/20 rounded-lg flex items-center justify-center text-3xl border border-blue-500/30">👨‍🚀</div>
+        <div>
+            <h3 class="font-['Orbitron'] text-blue-400 font-bold">Командор Варкас</h3>
+            <p class="text-[10px] text-gray-400 uppercase tracking-widest">Координатор Сектора</p>
+        </div>
+    </div>
+    <p id="dialog-text" class="text-sm text-gray-200 mb-8 italic leading-relaxed">...</p>
+    <div class="flex gap-3">
+        <button onclick="acceptQuest()" class="btn-sci-fi flex-1">Принять контракт</button>
+        <button onclick="closeDialog()" class="btn-sci-fi bg-red-900/20 border-red-900/50 text-red-400">Отмена</button>
+    </div>
+</div>
+
+<!-- Магазин Улучшений -->
+<div id="shop-ui" class="glass-panel p-8 w-[500px]">
+    <h2 class="font-bold text-xl tracking-tighter text-blue-400 font-['Orbitron'] mb-6 uppercase border-b border-blue-500/20 pb-2">Модернизация Корабля</h2>
+    <div class="grid grid-cols-1 gap-4" id="shop-items"></div>
+    <button onclick="closeShop()" class="btn-sci-fi mt-8 w-full opacity-60">Покинуть док</button>
+</div>
+
+<!-- Терминал Продажи -->
+<div id="sell-ui" class="glass-panel p-8 w-[400px]">
+    <h2 class="font-bold text-xl tracking-tighter text-yellow-500 font-['Orbitron'] mb-4 uppercase">Скупка Ресурсов</h2>
+    <div id="sell-info" class="mb-6">
+        <p class="text-sm text-gray-400">Ваш текущий груз:</p>
+        <p id="sell-cargo-desc" class="text-lg font-bold text-white mt-1">---</p>
+    </div>
+    <div class="flex flex-col gap-3">
+        <button id="btn-sell-action" onclick="sellCargo()" class="btn-sci-fi border-yellow-500 text-yellow-500 hover:bg-yellow-500/20">Продать всё за <span id="sell-price">0</span> 💳</button>
+        <button onclick="closeSell()" class="btn-sci-fi opacity-60">Закрыть</button>
+    </div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const SFX = {
+    ctx: null,
+    init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+    play(freq, type = 'sine', duration = 0.1, vol = 0.1) {
+        if (!this.ctx) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + duration);
+    },
+    shoot() { this.play(400, 'square', 0.1, 0.05); },
+    hit() { this.play(100, 'sawtooth', 0.2, 0.1); },
+    pickup() { this.play(800, 'sine', 0.15, 0.1); },
+    ui() { this.play(600, 'sine', 0.05, 0.05); },
+    repair() { this.play(200, 'sine', 0.4, 0.05); }
+};
+
+const TIERS = [
+    { id: 0, name: 'Кеплер-А', ore: 'Железо', color: '#95a5a6', bgColor: '#1a1b1c', price: 15, enemyColor: '#ffffff' },
+    { id: 1, name: 'Магма-4', ore: 'Сера', color: '#e67e22', bgColor: '#2a0a00', price: 35, enemyColor: '#ff6600' },
+    { id: 2, name: 'Циан-9', ore: 'Метан', color: '#1abc9c', bgColor: '#001a1a', price: 75, enemyColor: '#00ffff' },
+    { id: 3, name: 'Ледяной Пик', ore: 'Кристалл', color: '#ecf0f1', bgColor: '#1a2a35', price: 150, enemyColor: '#aaddff' },
+    { id: 4, name: 'Титан-X', ore: 'Титан', color: '#34495e', bgColor: '#0d1217', price: 300, enemyColor: '#556677' },
+    { id: 5, name: 'Ксенон-Г', ore: 'Изотоп', color: '#9b59b6', bgColor: '#1a002a', price: 650, enemyColor: '#cc00ff' },
+    { id: 6, name: 'Золотая Оса', ore: 'Золото', color: '#f1c40f', bgColor: '#2a2200', price: 1400, enemyColor: '#ffff00' },
+    { id: 7, name: 'Ядовитый Плющ', ore: 'Токсин', color: '#2ecc71', bgColor: '#051a05', price: 3000, enemyColor: '#00ff00' },
+    { id: 8, name: 'Обсидиан', ore: 'Материя', color: '#2c3e50', bgColor: '#050505', price: 6500, enemyColor: '#444444' },
+    { id: 9, name: 'Сингулярность', ore: 'Антивещество', color: '#e74c3c', bgColor: '#100000', price: 20000, enemyColor: '#ff0000' }
+];
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const mCanvas = document.getElementById('minimapCanvas');
+const mCtx = mCanvas.getContext('2d');
+
+let gameState = 'MENU';
+let activeQuest = null;
+let currentPlanet = null;
+let mouse = { x: 0, y: 0, down: false };
+
+let player = {
+    x: 400, y: 300, vx: 0, vy: 0, angle: 0,
+    accel: 0.2, friction: 0.98,
+    hp: 100, maxHp: 100, coins: 100, cargo: 0, maxCargo: 10,
+    cargoType: null, damage: 20,
+    upgrades: { engine: 1, shield: 1, damage: 1, cargo: 1, hull: 1 }
+};
+
+let planets = [], bullets = [], particles = [], enemies = [], planetResources = [], stars = [];
+let keys = {};
+let lastShot = 0;
+
+function init() {
+    window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+    window.dispatchEvent(new Event('resize'));
+
+    for(let i=0; i<800; i++) stars.push({ x: Math.random()*25000-12500, y: Math.random()*25000-12500, size: Math.random()*2, alpha: Math.random() });
+
+    planets = TIERS.map((t, i) => ({
+        ...t, x: Math.cos(i * 0.8) * (3000 + i * 1800), y: Math.sin(i * 0.8) * (3000 + i * 1800), radius: 150 + i * 25
+    }));
+
+    window.addEventListener('keydown', e => { keys[e.code] = true; SFX.init(); });
+    window.addEventListener('keyup', e => keys[e.code] = false);
+    window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+    window.addEventListener('mousedown', () => { mouse.down = true; SFX.init(); });
+    window.addEventListener('mouseup', () => mouse.down = false);
+
+    // Первичная проверка сохранения при загрузке страницы
+    checkSaveData();
+    
+    requestAnimationFrame(gameLoop);
+}
+
+function checkSaveData() {
+    const savedData = localStorage.getItem('nova_deep_save');
+    const btnContinue = document.getElementById('btn-continue');
+    const saveStatus = document.getElementById('save-status');
+
+    if (savedData) {
+        btnContinue.classList.remove('hidden');
+        saveStatus.classList.add('active');
+        saveStatus.innerHTML = '<span class="w-2 h-2 rounded-full bg-current"></span><span>ДАННЫЕ СОХРАНЕНИЯ ОБНАРУЖЕНЫ</span>';
+    } else {
+        btnContinue.classList.add('hidden');
+        saveStatus.classList.remove('active');
+        saveStatus.innerHTML = '<span class="w-2 h-2 rounded-full bg-current opacity-20"></span><span class="opacity-30">СОХРАНЕНИЙ НЕ НАЙДЕНО</span>';
+    }
+}
+
+function startGame(isNew) {
+    if (!isNew && localStorage.getItem('nova_deep_save')) {
+        const save = JSON.parse(localStorage.getItem('nova_deep_save'));
+        player = save.player; 
+        activeQuest = save.activeQuest;
+    } else {
+        // Сброс игрока для новой игры
+        player = {
+            x: 400, y: 300, vx: 0, vy: 0, angle: 0,
+            accel: 0.2, friction: 0.98,
+            hp: 100, maxHp: 100, coins: 100, cargo: 0, maxCargo: 10,
+            cargoType: null, damage: 20,
+            upgrades: { engine: 1, shield: 1, damage: 1, cargo: 1, hull: 1 }
+        };
+        activeQuest = null;
+    }
+    gameState = 'STATION';
+    document.getElementById('overlay-screen').style.display = 'none';
+    document.getElementById('game-hud').style.display = 'flex';
+    document.getElementById('minimap-ui').style.display = 'block';
+    SFX.ui();
+}
+
+function update() {
+    if (gameState === 'MENU') return;
+
+    const dx = mouse.x - canvas.width / 2;
+    const dy = mouse.y - canvas.height / 2;
+    player.angle = Math.atan2(dy, dx);
+
+    if (keys['KeyW']) {
+        player.vx += Math.cos(player.angle) * (player.accel + player.upgrades.engine * 0.03);
+        player.vy += Math.sin(player.angle) * (player.accel + player.upgrades.engine * 0.03);
+        if (Math.random() > 0.4) spawnParticle(player.x - Math.cos(player.angle)*15, player.y - Math.sin(player.angle)*15, '#00d4ff', 1);
+    }
+
+    if (mouse.down && Date.now() - lastShot > 250 - (player.upgrades.damage * 5)) {
+        bullets.push({
+            x: player.x + Math.cos(player.angle)*20, y: player.y + Math.sin(player.angle)*20,
+            vx: Math.cos(player.angle) * 15 + player.vx, vy: Math.sin(player.angle) * 15 + player.vy,
+            life: 60, owner: 'player', damage: player.damage
+        });
+        lastShot = Date.now(); SFX.shoot();
+    }
+
+    player.x += player.vx; player.y += player.vy;
+    player.vx *= player.friction; player.vy *= player.friction;
+
+    if (gameState === 'STATION') updateStation();
+    else if (gameState === 'SPACE') updateSpace();
+    else if (gameState === 'PLANET') updatePlanet();
+
+    bullets.forEach((b, i) => { b.x += b.vx; b.y += b.vy; b.life--; if (b.life <= 0) bullets.splice(i, 1); });
+    particles.forEach((p, i) => { p.x += p.vx; p.y += p.vy; p.life -= 0.02; if (p.life <= 0) particles.splice(i, 1); });
+    updateUI();
+}
+
+function updateStation() {
+    // Ремонт на входе на станцию
+    if (player.hp < player.maxHp) {
+        player.hp = player.maxHp;
+        SFX.repair();
+    }
+
+    if (Math.hypot(player.x - 700, player.y - 300) < 80) {
+        if(document.getElementById('shop-ui').style.display !== 'block') { 
+            document.getElementById('shop-ui').style.display = 'block'; 
+            populateShop(); 
+            saveData(); 
+        }
+    } else closeShop();
+
+    if (Math.hypot(player.x - 500, player.y - 300) < 80) { 
+        if(document.getElementById('sell-ui').style.display !== 'block') {
+            openSell(); 
+            saveData(); 
+        }
+    } else closeSell();
+
+    if (Math.hypot(player.x - 400, player.y - 600) < 70) {
+        if (!activeQuest && document.getElementById('dialog-ui').style.display !== 'block') {
+            document.getElementById('dialog-ui').style.display = 'block';
+            document.getElementById('dialog-text').innerText = "Пилот, работа на окраинах секторов не для слабых. Нам нужно очистить торговые пути или достать редкую руду. Платим фиксированно. Интересует?";
+            saveData(); 
+        }
+    } else closeDialog();
+
+    if (Math.hypot(player.x - 150, player.y - 300) < 70) {
+        gameState = 'SPACE'; player.x = 400; player.y = 0; player.vx = 4; 
+        saveData(); 
+    }
+}
+
+function updateSpace() {
+    if (Math.hypot(player.x, player.y) < 220) {
+        gameState = 'STATION'; player.x = 250; player.y = 300; player.vx = 0; player.vy = 0;
+    }
+
+    planets.forEach(p => {
+        const d = Math.hypot(player.x - p.x, player.y - p.y);
+        if (d < p.radius + 20) {
+            if (player.upgrades.shield >= p.id + 1) landOnPlanet(p);
+            else { player.hp -= 0.5; player.vx = (player.x - p.x) * 0.1; player.vy = (player.y - p.y) * 0.1; SFX.hit(); }
+        }
+    });
+
+    const distFromBase = Math.hypot(player.x, player.y);
+    const difficultyLevel = Math.floor(distFromBase / 2000);
+    
+    if (enemies.length < 5) {
+        const tier = Math.min(9, difficultyLevel);
+        enemies.push({ 
+            x: player.x + (Math.random()-0.5)*4000, y: player.y + (Math.random()-0.5)*4000, 
+            hp: 60 + tier * 150, maxHp: 60 + tier * 150, tier: tier, radius: 20 + tier * 2, color: TIERS[tier].color,
+            isSpaceEnemy: true
+        });
+    }
+    handleCombat(enemies);
+}
+
+function landOnPlanet(p) {
+    currentPlanet = p; gameState = 'PLANET';
+    player.x = 0; player.y = 0; player.vx = 0; player.vy = 0;
+    planetResources = []; enemies = [];
+    for(let i=0; i<10 + p.id*3; i++) planetResources.push({ x: (Math.random()-0.5)*1800, y: (Math.random()-0.5)*1800, collected: false });
+    for(let i=0; i<3 + p.id; i++) enemies.push({ 
+        x: (Math.random()-0.5)*1500, y: (Math.random()-0.5)*1500, 
+        hp: 50 + p.id*60, maxHp: 50 + p.id*60, radius: 18, color: p.enemyColor, tier: p.id 
+    });
+    SFX.ui();
+}
+
+function updatePlanet() {
+    if (Math.hypot(player.x, player.y) > 1000) {
+        gameState = 'SPACE';
+        const a = Math.atan2(player.y, player.x);
+        player.x = currentPlanet.x + Math.cos(a)*(currentPlanet.radius + 80);
+        player.y = currentPlanet.y + Math.sin(a)*(currentPlanet.radius + 80);
+        player.vx = Math.cos(a)*6; player.vy = Math.sin(a)*6;
+    }
+    planetResources.forEach(res => {
+        if (!res.collected && Math.hypot(player.x - res.x, player.y - res.y) < 45) {
+            if (player.cargo < player.maxCargo) {
+                if (player.cargoType && player.cargoType !== currentPlanet.ore) return;
+                res.collected = true; player.cargo++; player.cargoType = currentPlanet.ore;
+                SFX.pickup();
+                if (activeQuest && activeQuest.type === 'collect' && activeQuest.target === currentPlanet.ore) {
+                    activeQuest.progress++; if (activeQuest.progress >= activeQuest.goal) completeQuest();
+                }
+            }
+        }
+    });
+    handleCombat(enemies);
+}
+
+function handleCombat(targets) {
+    targets.forEach((en, i) => {
+        const d = Math.hypot(player.x - en.x, player.y - en.y);
+        if (d < 800) {
+            const a = Math.atan2(player.y - en.y, player.x - en.x);
+            en.x += Math.cos(a) * 2.8; en.y += Math.sin(a) * 2.8;
+            if (d < 450 && Math.random() < 0.02) {
+                const dmgBoost = en.tier ? en.tier * 2 : 0;
+                bullets.push({ x: en.x, y: en.y, vx: Math.cos(a)*10, vy: Math.sin(a)*10, life: 55, owner: 'enemy', damage: 4 + dmgBoost });
+            }
+        }
+        bullets.forEach((b, bi) => {
+            if (b.owner === 'player' && Math.hypot(b.x - en.x, b.y - en.y) < en.radius) {
+                en.hp -= b.damage; bullets.splice(bi, 1); SFX.hit();
+                if (en.hp <= 0) {
+                    targets.splice(i, 1); player.coins += 15 + (en.tier||0)*25;
+                    spawnExplosion(en.x, en.y, en.color, 8);
+                    if (activeQuest && activeQuest.type === 'kill') {
+                        activeQuest.progress++; if (activeQuest.progress >= activeQuest.goal) completeQuest();
+                    }
+                }
+            }
+        });
+    });
+    bullets.forEach((b, bi) => {
+        if (b.owner === 'enemy' && Math.hypot(b.x - player.x, b.y - player.y) < 15) {
+            player.hp -= b.damage || 4; bullets.splice(bi, 1); SFX.hit();
+            if (player.hp <= 0) die();
+        }
+    });
+}
+
+function die() { player.hp = player.maxHp; player.x = 250; player.y = 300; player.vx = 0; player.vy = 0; player.cargo = 0; gameState = 'STATION'; saveData(); }
+
+function draw() {
+    if (gameState === 'MENU') return;
+    ctx.fillStyle = gameState === 'PLANET' ? currentPlanet.bgColor : '#010103';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(canvas.width/2 - player.x, canvas.height/2 - player.y);
+
+    if (gameState === 'STATION') drawStation();
+    else if (gameState === 'SPACE') drawSpace();
+    else drawPlanetSurface();
+
+    particles.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); });
+    ctx.globalAlpha = 1;
+
+    enemies.forEach(en => {
+        ctx.fillStyle = en.color; ctx.shadowBlur = 10; ctx.shadowColor = en.color;
+        ctx.beginPath(); ctx.arc(en.x, en.y, en.radius, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(en.x - 20, en.y - en.radius - 10, 40, 4);
+        ctx.fillStyle = '#f00'; ctx.fillRect(en.x - 20, en.y - en.radius - 10, 40 * (Math.max(0, en.hp) / en.maxHp), 4);
+    });
+
+    bullets.forEach(b => { ctx.fillStyle = b.owner === 'player' ? '#00d4ff' : '#ff00ff'; ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, Math.PI*2); ctx.fill(); });
+
+    ctx.save(); ctx.translate(player.x, player.y); ctx.rotate(player.angle);
+    ctx.fillStyle = '#00d4ff'; ctx.beginPath();
+    ctx.moveTo(22, 0); ctx.lineTo(-12, -14); ctx.lineTo(-8, 0); ctx.lineTo(-12, 14); ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    ctx.restore();
+    if (gameState === 'SPACE') { drawMinimap(); drawNavigation(); }
+}
+
+function drawSpace() {
+    stars.forEach(s => { ctx.fillStyle = `rgba(255,255,255,${s.alpha})`; ctx.fillRect(s.x, s.y, s.size, s.size); });
+
+    ctx.save();
+    const pulse = 0.8 + Math.sin(Date.now()*0.003)*0.2;
+    ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0, 0, 120, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = 'rgba(0, 212, 255, 0.1)'; ctx.fill();
+    ctx.fillStyle = '#1e272e';
+    ctx.fillRect(-80, -20, 160, 40); ctx.fillRect(-20, -80, 40, 160);
+    ctx.beginPath(); ctx.arc(0,0, 40, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = `rgba(0, 255, 128, ${pulse})`;
+    for(let i=0; i<4; i++) {
+        const a = i * Math.PI/2 + Date.now()*0.0005;
+        ctx.beginPath(); ctx.arc(Math.cos(a)*120, Math.sin(a)*120, 8, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = '#fff'; ctx.font = "bold 16px Orbitron"; ctx.textAlign = "center";
+    ctx.fillText("СТАНЦИЯ АЛЬФА", 0, -140);
+    ctx.restore();
+
+    planets.forEach(p => {
+        const g = ctx.createRadialGradient(p.x - p.radius*0.3, p.y - p.radius*0.3, 0, p.x, p.y, p.radius);
+        g.addColorStop(0, p.color); g.addColorStop(1, '#000');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = player.upgrades.shield >= p.id+1 ? '#0f8' : '#f33';
+        ctx.setLineDash([8, 8]); ctx.beginPath(); ctx.arc(p.x, p.y, p.radius+20, 0, Math.PI*2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#fff'; ctx.font = "bold 14px Orbitron"; ctx.textAlign = "center";
+        ctx.fillText(`${p.name} (T${p.id+1})`, p.x, p.y - p.radius - 35);
+    });
+}
+
+function drawPlanetSurface() {
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 20;
+    ctx.beginPath(); ctx.arc(0, 0, 1000, 0, Math.PI*2); ctx.stroke();
+    planetResources.forEach(res => {
+        if (!res.collected) {
+            ctx.fillStyle = currentPlanet.color; ctx.shadowBlur = 15; ctx.shadowColor = currentPlanet.color;
+            ctx.beginPath(); ctx.moveTo(res.x, res.y-10); ctx.lineTo(res.x+10, res.y+10); ctx.lineTo(res.x-10, res.y+10); ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    });
+}
+
+function drawStation() {
+    ctx.strokeStyle = '#1e272e'; ctx.lineWidth = 1;
+    for(let i=0; i<=1000; i+=200) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 1000); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(1000, i); ctx.stroke(); }
+    const drawZone = (x, y, color, label) => {
+        ctx.fillStyle = '#1e272e'; ctx.fillRect(x, y, 120, 120);
+        ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.strokeRect(x, y, 120, 120);
+        ctx.fillStyle = '#fff'; ctx.font = "10px Orbitron"; ctx.textAlign = "center";
+        ctx.fillText(label, x + 60, y + 65);
+    };
+    drawZone(90, 240, '#2ed573', "ВЗЛЕТ"); drawZone(640, 240, '#00d4ff', "ДОК"); drawZone(440, 240, '#ffa502', "РЫНОК"); drawZone(340, 540, '#3742fa', "ЗАДАНИЯ");
+    
+    ctx.strokeStyle = 'rgba(0, 255, 128, 0.2)';
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(50, 50, 900, 900);
+    ctx.setLineDash([]);
+}
+
+function drawNavigation() {
+    drawPointer(0, 0, '#00d4ff', "БАЗА");
+    if (activeQuest) {
+        let tx, ty;
+        if (activeQuest.type === 'collect') { const p = planets.find(pl => pl.ore === activeQuest.target); tx = p.x; ty = p.y; }
+        else if(enemies.length > 0) { tx = enemies[0].x; ty = enemies[0].y; }
+        if (tx !== undefined) drawPointer(tx, ty, '#ffcc00', "ЦЕЛЬ");
+    }
+}
+
+function drawPointer(tx, ty, color, label) {
+    if (Math.hypot(player.x - tx, player.y - ty) < 450) return;
+    const angle = Math.atan2(ty - player.y, tx - player.x);
+    const arrowDist = Math.min(canvas.width, canvas.height) * 0.38;
+    ctx.save(); ctx.translate(canvas.width/2, canvas.height/2); ctx.rotate(angle);
+    ctx.fillStyle = color; ctx.beginPath();
+    ctx.moveTo(arrowDist, 0); ctx.lineTo(arrowDist-18, -10); ctx.lineTo(arrowDist-12, 0); ctx.lineTo(arrowDist-18, 10); ctx.fill();
+    ctx.restore();
+}
+
+function drawMinimap() {
+    mCtx.fillStyle = '#000'; mCtx.fillRect(0,0,180,180);
+    const z = 0.006, cx = 90;
+    planets.forEach(p => { mCtx.fillStyle = p.color; mCtx.beginPath(); mCtx.arc(cx + (p.x - player.x)*z, cx + (p.y - player.y)*z, 3, 0, Math.PI*2); mCtx.fill(); });
+    mCtx.fillStyle = '#00d4ff'; mCtx.fillRect(cx-2, cx-2, 4, 4);
+}
+
+function populateShop() {
+    const container = document.getElementById('shop-items');
+    container.innerHTML = '';
+    const upgrades = [
+        { id: 'engine', name: 'Тяговый двигатель', cost: Math.floor(250 * Math.pow(2.2, player.upgrades.engine-1)) },
+        { id: 'shield', name: 'Система щитов (Тир)', cost: Math.floor(500 * Math.pow(2.5, player.upgrades.shield-1)) },
+        { id: 'damage', name: 'Лазерные пушки', cost: Math.floor(350 * Math.pow(2, player.upgrades.damage-1)) },
+        { id: 'cargo', name: 'Грузовой модуль', cost: Math.floor(200 * Math.pow(1.8, player.upgrades.cargo-1)) },
+        { id: 'hull', name: 'Усиление корпуса', cost: Math.floor(300 * Math.pow(1.9, player.upgrades.hull-1)) }
+    ];
+    upgrades.forEach(u => {
+        const div = document.createElement('div');
+        div.className = "flex justify-between items-center p-4 bg-white/5 rounded border border-white/10";
+        div.innerHTML = `<div><div class="font-bold text-white text-xs uppercase font-['Orbitron']">${u.name} (Lvl ${player.upgrades[u.id]})</div></div>
+            <button onclick="buyUpgrade('${u.id}', ${u.cost})" class="btn-sci-fi" ${player.coins < u.cost ? 'disabled' : ''}>${u.cost} 💳</button>`;
+        container.appendChild(div);
+    });
+}
+
+function buyUpgrade(type, cost) {
+    if (player.coins >= cost) {
+        player.coins -= cost; player.upgrades[type]++;
+        if (type === 'damage') player.damage += 18;
+        if (type === 'cargo') player.maxCargo += 8;
+        if (type === 'hull') { player.maxHp += 50; player.hp = player.maxHp; }
+        SFX.ui(); saveData(); populateShop();
+    }
+}
+
+function openSell() {
+    document.getElementById('sell-ui').style.display = 'block';
+    if (player.cargo > 0) {
+        const tier = TIERS.find(t => t.ore === player.cargoType);
+        const price = player.cargo * (tier ? tier.price : 5);
+        document.getElementById('sell-cargo-desc').innerText = `${player.cargo} ед. ${player.cargoType}`;
+        document.getElementById('sell-price').innerText = price;
+        document.getElementById('btn-sell-action').disabled = false;
+    } else {
+        document.getElementById('sell-cargo-desc').innerText = "Трюм пуст";
+        document.getElementById('sell-price').innerText = "0";
+        document.getElementById('btn-sell-action').disabled = true;
+    }
+}
+
+function sellCargo() {
+    const tier = TIERS.find(t => t.ore === player.cargoType);
+    const price = player.cargo * (tier ? tier.price : 5);
+    player.coins += price; player.cargo = 0; player.cargoType = null;
+    SFX.pickup(); saveData(); openSell();
+}
+
+function acceptQuest() {
+    const isKill = Math.random() > 0.4;
+    if (isKill) activeQuest = { type: 'kill', goal: 4, progress: 0, reward: 150, desc: "Уничтожить пиратов в секторе: " };
+    else {
+        const target = planets[Math.floor(Math.random() * Math.min(planets.length, player.upgrades.shield))];
+        activeQuest = { type: 'collect', target: target.ore, goal: 6, progress: 0, reward: 200, desc: `Добыть ${target.ore}: ` };
+    }
+    closeDialog(); SFX.ui(); saveData();
+}
+
+function completeQuest() { player.coins += activeQuest.reward; activeQuest = null; SFX.ui(); saveData(); }
+
+function updateUI() {
+    document.getElementById('coins').innerText = Math.floor(player.coins);
+    document.getElementById('cargo').innerText = player.cargo;
+    document.getElementById('maxCargo').innerText = player.maxCargo;
+    document.getElementById('hp-text').innerText = Math.ceil(player.hp);
+    document.getElementById('max-hp-text').innerText = player.maxHp;
+    document.getElementById('hp-bar').style.width = (player.hp / player.maxHp * 100) + '%';
+    document.getElementById('eng-lvl').innerText = player.upgrades.engine;
+    document.getElementById('shd-lvl').innerText = player.upgrades.shield;
+    document.getElementById('dmg-lvl').innerText = player.upgrades.damage;
+    document.getElementById('hull-lvl').innerText = player.upgrades.hull;
+    document.getElementById('cargo-type').innerText = player.cargoType || "";
+    if (activeQuest) {
+        document.getElementById('quest-hud').style.display = 'block';
+        document.getElementById('quest-desc').innerText = `${activeQuest.desc} ${activeQuest.progress}/${activeQuest.goal}`;
+    } else document.getElementById('quest-hud').style.display = 'none';
+    document.getElementById('sector-name').innerText = gameState === 'STATION' ? "СТАНЦИЯ АЛЬФА" : (gameState === 'SPACE' ? "ГЛУБОКИЙ КОСМОС" : currentPlanet.name);
+}
+
+function spawnParticle(x, y, color, size) { particles.push({ x, y, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 1, color, size: 2*size }); }
+function spawnExplosion(x, y, color, count) { for(let i=0; i<count*4; i++) spawnParticle(x, y, color, 1.5 + Math.random()*2); }
+
+function saveData() { 
+    localStorage.setItem('nova_deep_save', JSON.stringify({ player, activeQuest })); 
+    checkSaveData(); // Обновляем индикаторы
+}
+
+function closeDialog() { document.getElementById('dialog-ui').style.display = 'none'; }
+function closeShop() { document.getElementById('shop-ui').style.display = 'none'; }
+function closeSell() { document.getElementById('sell-ui').style.display = 'none'; }
+function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
+
+init();
+</script>
+</body>
+</html>
